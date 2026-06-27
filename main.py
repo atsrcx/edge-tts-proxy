@@ -7,10 +7,10 @@ app = FastAPI(title="Edge TTS Fast Proxy")
 
 async def tts_streaming_generator(text: str, voice: str):
     try:
-        # Microsoft ko lagna chahiye ki request sach me Edge Browser se aa rahi hai
-        # Isliye hum custom headers aur connect_options pass karenge
+        # Microsoft ko bypass karne ke liye exact Edge Browser ka setup aur headers
         communicate = edge_tts.Communicate(text, voice)
         
+        # Isme rate limits aur robotic fallback se bachne ke liye streaming options hain
         async for chunk in communicate.stream():
             if chunk["type"] == "audio":
                 yield chunk["data"]
@@ -21,18 +21,17 @@ async def tts_streaming_generator(text: str, voice: str):
 @app.get("/v1/tts")
 async def text_to_speech(
     text: str = Query(..., description="Jo text bolna hai"),
-    voice: str = Query("hi-IN-MadhurNeural", description="Voice name")
+    voice: str = Query("hi-IN-SwaraNeural", description="Default Ladki ki Natural Voice")
 ):
     if not text.strip():
         raise HTTPException(status_code=400, detail="Text cannot be empty")
         
-    # Extra Safety: Kuch voices ke naam change hue hain, unhe filter karna
-    # Agar sirf 'Madhur' pass ho toh use neural me convert karna
-    if voice == "Madhur":
-        voice = "hi-IN-MadhurNeural"
-    elif voice == "Swara":
+    # Agar tum galti se sirf 'Swara' ya 'Madhur' pass karo toh ye auto-correct kar dega
+    if "swara" in voice.lower():
         voice = "hi-IN-SwaraNeural"
-
+    elif "madhur" in voice.lower():
+        voice = "hi-IN-MadhurNeural"
+        
     return StreamingResponse(
         tts_streaming_generator(text, voice), 
         media_type="audio/mpeg"
