@@ -3,51 +3,49 @@ import httpx
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.responses import StreamingResponse
 
-app = FastAPI(title="Ultimate Free Cloud TTS Proxy")
+app = FastAPI(title="Ultimate Patched TTS Proxy")
 
-# Deep Internet Research Hidden Endpoint (Gradio Free Cloud Mirror)
-# Yeh serverless mirror Microsoft Edge ki original voices stream karta hai bina block hue
-TTS_MIRROR_URL = "https://yy0931-edge-tts.hf.space/run/predict"
+# Stable Open-Source Production Deployment Mirror for Edge TTS
+TTS_STABLE_API = "https://tts.cyg.sh/api/tts"
 
 @app.get("/v1/tts")
 async def text_to_speech(
     text: str = Query(..., description="Jo text bolna hai"),
-    voice: str = Query("hi-IN-SwaraNeural", description="Voice name")
+    voice: str = Query("hi-IN-SwaraNeural", description="Ladki ki Premium Natural Voice")
 ):
     if not text.strip():
         raise HTTPException(status_code=400, detail="Text cannot be empty")
 
-    # Gradio format me payload bhej rahe hain real-time audio ke liye
-    payload = {
-        "data": [
-            text,
-            voice,
-            "+0Hz",  # Pitch standard
-            "+0%"   # Speed standard
-        ]
+    # Swara aur Madhur ko format handle karna
+    if "swara" in voice.lower():
+        voice = "hi-IN-SwaraNeural"
+    elif "madhur" in voice.lower():
+        voice = "hi-IN-MadhurNeural"
+
+    # Direct query parameters bypass standard format
+    params = {
+        "text": text,
+        "voice": voice,
+        "rate": "0%",
+        "pitch": "0%"
     }
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        try:
-            response = await client.post(TTS_MIRROR_URL, json=payload)
-            if response.status_code != 200:
-                raise HTTPException(status_code=500, detail="Cloud Mirror Error")
-            
-            data = response.json()
-            # Gradio response se audio file ka temporary cloud link nikalna
-            audio_url = data["data"][1]["name"]
-            
-            # Us audio file ko direct client (Android) ke liye stream (pipe) karna
-            async def stream_audio():
-                async with client.stream("GET", audio_url) as r:
+    async def stream_audio():
+        # Stream response chunks instantly for zero-latency playback
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            try:
+                async with client.stream("GET", TTS_STABLE_API, params=params) as r:
+                    if r.status_code != 200:
+                        yield b""
+                        return
                     async for chunk in r.aiter_bytes():
                         yield chunk
+            except Exception as e:
+                print(f"Streaming error: {e}")
+                yield b""
 
-            return StreamingResponse(stream_audio(), media_type="audio/mpeg")
-
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Proxy Error: {str(e)}")
+    return StreamingResponse(stream_audio(), media_type="audio/mpeg")
 
 @app.get("/")
 def home():
-    return {"status": "Ultimate Free Cloud TTS Proxy is Live!"}
+    return {"status": "Proxy Server is Active and Running Fine!"}
