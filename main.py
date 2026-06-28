@@ -1,42 +1,53 @@
 import asyncio
+import httpx
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.responses import StreamingResponse
-import edge_tts
 
-app = FastAPI(title="Edge TTS Fast Proxy")
+app = FastAPI(title="Ultimate Free Cloud TTS Proxy")
 
-async def tts_streaming_generator(text: str, voice: str):
-    try:
-        # Microsoft ko bypass karne ke liye exact Edge Browser ka setup aur headers
-        communicate = edge_tts.Communicate(text, voice)
-        
-        # Isme rate limits aur robotic fallback se bachne ke liye streaming options hain
-        async for chunk in communicate.stream():
-            if chunk["type"] == "audio":
-                yield chunk["data"]
-                
-    except Exception as e:
-        print(f"Error in streaming: {e}")
+# Deep Internet Research Hidden Endpoint (Gradio Free Cloud Mirror)
+# Yeh serverless mirror Microsoft Edge ki original voices stream karta hai bina block hue
+TTS_MIRROR_URL = "https://yy0931-edge-tts.hf.space/run/predict"
 
 @app.get("/v1/tts")
 async def text_to_speech(
     text: str = Query(..., description="Jo text bolna hai"),
-    voice: str = Query("hi-IN-SwaraNeural", description="Default Ladki ki Natural Voice")
+    voice: str = Query("hi-IN-SwaraNeural", description="Voice name")
 ):
     if not text.strip():
         raise HTTPException(status_code=400, detail="Text cannot be empty")
-        
-    # Agar tum galti se sirf 'Swara' ya 'Madhur' pass karo toh ye auto-correct kar dega
-    if "swara" in voice.lower():
-        voice = "hi-IN-SwaraNeural"
-    elif "madhur" in voice.lower():
-        voice = "hi-IN-MadhurNeural"
-        
-    return StreamingResponse(
-        tts_streaming_generator(text, voice), 
-        media_type="audio/mpeg"
-    )
+
+    # Gradio format me payload bhej rahe hain real-time audio ke liye
+    payload = {
+        "data": [
+            text,
+            voice,
+            "+0Hz",  # Pitch standard
+            "+0%"   # Speed standard
+        ]
+    }
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            response = await client.post(TTS_MIRROR_URL, json=payload)
+            if response.status_code != 200:
+                raise HTTPException(status_code=500, detail="Cloud Mirror Error")
+            
+            data = response.json()
+            # Gradio response se audio file ka temporary cloud link nikalna
+            audio_url = data["data"][1]["name"]
+            
+            # Us audio file ko direct client (Android) ke liye stream (pipe) karna
+            async def stream_audio():
+                async with client.stream("GET", audio_url) as r:
+                    async for chunk in r.aiter_bytes():
+                        yield chunk
+
+            return StreamingResponse(stream_audio(), media_type="audio/mpeg")
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Proxy Error: {str(e)}")
 
 @app.get("/")
 def home():
-    return {"status": "Edge TTS Proxy is Running Successfully!"}
+    return {"status": "Ultimate Free Cloud TTS Proxy is Live!"}
